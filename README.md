@@ -1,2 +1,2 @@
 # regresyon
-Fortnite oyunuyla alakalı verimizi kullanarak kurduğumuz regresyon modelinde değişkenlere ait skorlar ile genel skor tahmini yaptık.
+Fortnite oyunuyla alakalı verimizi kullanarak kurduğumuz regresyon modellerinden değişkenlere ait skorlar ile genel skor tahmini yapmak için en uygun modeli belirlemeye çalıştım.
