@@ -1,0 +1,269 @@
+---
+title: "Fortnite Players Stats"
+author: "ruveyda nur şen"
+
+date: "2023-01-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(broom)
+library(ggpubr)
+library(ISLR)
+```
+
+```{r}
+data<-read.csv("C:/Users/LENOVO/Desktop/DERS NOTLARI/regresyon ödevi/Fortnite_players_stats.csv")
+data
+View(data)
+```
+#import etmek gerekir
+```{r}
+head(data)
+```
+#kullanacağım değişkenlerden data.frame oluşturdum
+```{r}
+df<-data[c("Solo.score","Solo.top1","Solo.kd",
+                       "Solo.winRatio","Solo.matches","Solo.kills","Solo.minutesPlayed")]
+df
+```
+#değişkenler arasındaki ilişkiyi incelerim
+```{r}
+cor(df)
+```
+#Veri içersinde NA değerleri olduğu görülmektedir, yeniden düzenlersek.
+```{r}
+cor(na.omit(df))
+```
+#korelasyon matrisine baktığımızda bağımlı değişkenimiz Solo.score ile diğer veriler arasında pozitif bir ilişki olduğu görülüyor.
+#görsel olarak görmek için scatter plot çizdiririz
+
+```{r}
+pairs(na.omit(df),pch=19)
+```
+#Veri incelendiğinde veri içerisinde kayıp gözlmeler olduğu görülmektedir. Bu noktada kayıp gözlemleri işlem dışı bırakmak yerine doldurma işlemi yapabiliriz
+```{r}
+library(mice)
+md.pattern(df)
+```
+#1404 gözlemde NA değeri bulunmamaktadır.Veride de totalde 33 NA değerinin olduğu görülür.
+#impute sayısını vermektedir
+```{r}
+NAdoldur<-mice(df,m=5)
+```
+```{r}
+names(NAdoldur)
+NAdoldur$imp
+```
+# Her bir değişken için doldurulan rastgele değerler görüntülenir.
+```{r}
+degiskendoldur<-complete(NAdoldur,3)
+View(degiskendoldur)
+md.pattern(degiskendoldur)
+
+```
+#Model Oluşturma
+#Train set ve test set<-Verimizi %80-%20 şeklinde ayırdık.
+
+```{r}
+set.seed(145)
+sampleIndex<-sample(1:nrow(degiskendoldur),size = 0.8*nrow(degiskendoldur))
+
+trainset<-degiskendoldur[sampleIndex,]
+testset<-degiskendoldur[-sampleIndex,]
+View(trainset)
+View(testset)
+```
+
+```{r}
+names(degiskendoldur)
+```
+
+```{r}
+model1<-lm(Solo.score~.,data=trainset)
+model1
+```
+```{r}
+summary(model1)
+```
+#Sonuçlar incelendiğinde modelin R2=0.98 olarak elde edilmiştir, oldukça iyi bir değerdir. Bunun yanısıra model anlamlı çıkmıştır(p<2.2e−16). Modelimdeki bağımsız değişkenler anlamlı çıkmıştır.Aykırı değer kontrolü yaparak model 2 oluşturup modelimin anlamı arttırmaya çalışacağım.
+```{r}
+dist<-cooks.distance(model1)
+head(dist)
+```
+#Öncelikle distancleri belirlememiz gerekir.Ve ardından hangi ölçütten (noktadan) sonrası bizim için aykırı değer olucak onu belirlemeliyiz. Bu noktada 2 farklı ölçüt kullanılabilir.
+#Eğer herhangi bir distance bütün dist’ların ortalamsının 3 katından daha büyükse aykırı olabilir
+#Eğer herhangi bir distance 4/tüm dist değerinden büyükse aykırı olabilir.
+```{r}
+olcut1<- mean(dist)*3
+olcut2<-4/length(dist)
+olcut1;olcut2
+```
+```{r}
+olcut1Index<-which(dist>olcut1)
+olcut2Index<-which(dist>olcut2)
+length(olcut1Index)
+```
+```{r}
+length(olcut2Index)
+```
+#Görsel olarakda cook disatncleri incelersek;
+```{r}
+plot(1:length(dist),dist,type='p',ylim=range(dist)*c(1,1))
+```
+```{r}
+plot(1:length(dist),dist,type='p',ylim=range(dist)*c(1,0.001))
+```
+#ölçüt2 ile yeni bir model oluşturucam
+#ölcut değerini net görmek için line çizdirelim
+```{r}
+plot(1:length(dist),dist,type='p',ylim=range(dist)*c(1,0.07))
+abline(h=olcut2,col='red')
+```
+```{r}
+trainsetrem<-trainset[-olcut2Index,]
+nrow(trainset)
+```
+```{r}
+nrow(trainsetrem)
+```
+```{r}
+model2<-lm( Solo.score~Solo.top1+Solo.kd+Solo.winRatio+Solo.matches+      
+Solo.kills+Solo.minutesPlayed,data=trainsetrem)
+model2
+```
+```{r}
+summary(model2)
+```
+#R^2 değerim 0.99dur, oldukça yüksek.Ve oluşturulan model anlamlıdır.
+
+```{r}
+summary(model1)
+```
+#model 2 de r2 değerinde bir artış vardır.
+```{r}
+plot(model2)
+```
+#AIC ve BIC değerlendirme ölçütlerine göre model2 daha iyi görünmektedir. Bu durumu birde plot üzerinden inceledim yukarıda
+```{r}
+library(lmtest)
+bptest(model2)
+```
+
+
+
+
+
+```{r}
+AIC(model1,k=8)
+```
+
+```{r}
+AIC(model2,k=8)
+```
+```{r}
+BIC(model1)
+```
+```{r}
+BIC(model2)
+```
+```{r}
+predictions2<-predict(model2,testset)
+R2(predictions2,testset$Solo.score)
+```
+```{r}
+RMSE(predictions2,testset$Solo.score)
+```
+```{r}
+MAE(predictions2,testset$Solo.score)
+```
+```{r}
+predictions<-predict(model2,testset)
+R2(predictions,testset$Solo.score)
+```
+```{r}
+RMSE(predictions,testset$Solo.score)
+```
+```{r}
+MAE(predictions,testset$Solo.score)
+```
+
+
+
+
+
+
+#Şimdi Solo.kd değişkenimizi çıkartıp 3. bir model oluşturalım.
+```{r}
+model3<-lm(Solo.score~Solo.top1+Solo.winRatio+Solo.matches+      
+Solo.kills+Solo.minutesPlayed,data=trainsetrem)
+model3
+```
+```{r}
+summary(model3)
+```
+#Model3 sonuçları değerlendirildiğinde R2 değerinde belirgin bir artış yoktur.Ve oluşturulan model anlamlıdır.Katsayılar yorumlanadığında örneğin; Solo.top1 değişkeninindeki 1 birimlik değişim Solo.score üzerinde 59.4475  birimlik bir artışa neden olurken;Solo.matches  değişkeninde 1 birimlik bir artış Solo.score üzerinde 7.4760 birimlik bir azalışa neden olmaktadır.Ve benzeri yorumlar yapılabilir model katsayıları üzerinden.
+```{r}
+AIC(model2,k=8)
+
+
+```
+```{r}
+AIC(model3,k=7)
+```
+```{r}
+BIC(model2)
+```
+```{r}
+BIC(model3)
+```
+#AIC ve BIC değerlendirme ölçütlerine göre anlamlı bir fark olmasa da model3 çok az daha iyi görünmektedir. Bu durumu birde plot üzerinden inceleyelim;
+```{r}
+plot(model3)
+```
+```{r}
+bptest(model3)
+```
+```{r}
+testset2<-testset[-3]  
+predictions<-predict(model3,testset2)
+head(predictions)
+```
+```{r}
+library(caret)
+R2(predictions,testset2$Solo.score)
+```
+```{r}
+RMSE(predictions,testset2$Solo.score)
+```
+```{r}
+MAE(predictions,testset2$Solo.score)
+```
+#Sonuçları değerlendirirsek, model2 ile model3 arasında testset üzerinden belirgin bir fark görülmemektedir.Ayrıca bu noktada son oluşturalan modelin gerek veri ön işlemesi yapıldığında gerekse varsayımlar kontrol edildiğinde daha iyi olduğu düşünülebilir. Bu fark test verisi üzerinden incelendiğinde belirgin bir şekilde ortaya konulmuş olmasa da (bu durum cross validation ile yeniden gözden geçirilmelidir.) eğitim verisinde daha iyi sonuç verdiği gözlenmiştir.Bu noktada bir diğer varsayım olan Multicolinearity incelenmelidir.
+
+
+##Çoklu Bağlantı Sorunu##
+```{r}
+library(car)
+vif(model3)
+```
+#vif değerleri 10'dan küçük olmalı. burada 10dan büyük vif değeri gözükmemektedir. çoklu bağlantı problemi yoktur.
+
+
+
+##AŞAMALI REGRESYON##
+```{r}
+modela<-lm(Solo.score~Solo.top1+Solo.kd+Solo.winRatio+Solo.matches+      
+Solo.kills+Solo.minutesPlayed, data=trainset)
+step(lm(Solo.score~1, data=trainsetrem),direction = "forward",
+     scope = ~Solo.top1+Solo.kd+Solo.winRatio+Solo.matches+      
+Solo.kills+Solo.minutesPlayed) 
+```
+
+#Elde edilen sonuçlar değerlendirildiğinde Start:AIC=28911.84 bu modelde sadece sbt terim var; ikinci aşamada modele ek olarak teker teker değişkenler eklenip modelin AIC değeri değerlendiriliyor, ve hangi değişkenin modele katkısı daha fazla kannatine AIC değeri en düşük olan alınarak karar veriliyor. Bu örnek de Solo.minutesPlayed değişkeni min(AIC) değerine sahip onu modele alarak bir diğer adıma geçilir.
